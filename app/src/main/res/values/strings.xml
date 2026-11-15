@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">OneKey BLE Lab</string>
+    <style name="Theme.OneKey" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+</resources>
