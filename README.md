@@ -40,7 +40,7 @@ adb -d shell am start -n com.onekey.blelab/.MainActivity
 2. **설정 → 배터리 → 백그라운드 사용 제한**에서 앱을 절전 및 초절전 목록에서 제거합니다. 필요하면 **절전 예외 앱** 또는 **Never auto sleeping apps**에 추가합니다.
 3. 기본 비교는 시스템 절전 모드를 끈 상태에서 진행하고 이후 절전 모드를 켠 상태도 별도로 기록합니다. 설정 변경에 따른 배터리 차이는 Galaxy의 앱 배터리 사용량 화면에서 확인합니다.
 
-서비스는 시작 시 `connectedDevice` 유형으로 승격되며 홈 화면 이동, 최근 앱에서 화면 제거, 화면 잠금과 별도로 실행됩니다. Bluetooth가 꺼지면 현재 세션은 재활성화 대기로 바뀝니다. 서비스가 살아 있을 때 Bluetooth가 다시 켜지면 같은 설정으로 한 번 시작을 시도합니다. 오류나 종료 이후에는 앱에서 수동으로 다시 시작할 수 있습니다. 프로세스가 종료되면 `START_NOT_STICKY`이므로 OS에 자동 재실행을 요청하지 않습니다. [포그라운드 서비스 시작 정책](https://developer.android.com/develop/background-work/services/fgs/restrictions-bg-start), [활성 앱 목록에서 중지](https://developer.android.com/develop/background-work/services/fgs/handle-user-stopping)
+서비스는 시작 시 `connectedDevice` 유형으로 승격되고 Sticky 서비스를 사용합니다. 실행 설정을 동기식 로컬 저장소에 보관해 Android가 시스템 리소스 회수 뒤 서비스를 다시 생성하면 저장한 설정으로 광고를 재시작합니다. Sticky 재시작은 시스템에 재생성을 요청하는 방식이어서 제조사 정책이나 시스템 상태에 따라 보장되지는 않습니다. Bluetooth가 꺼진 상태에서는 재활성화를 기다렸다가 켜지면 복구합니다. 송신 중에는 Android가 요구하는 진행 중 알림을 표시하므로 일반 알림처럼 스와이프로 닫을 수 없습니다. 앱이나 알림의 **광고 중지** 버튼, Android 활성 앱 목록의 **중지**, 설정의 **강제 중지**는 사용자가 요청한 종료이므로 자동 복구하지 않습니다. 종료 사유를 확인해 사용자가 중지했을 때 저장 설정도 지웁니다. 다시 송신하려면 앱에서 시작 버튼을 누르세요. [포그라운드 서비스 시작 및 재시작](https://developer.android.com/reference/android/app/Service#START_STICKY), [활성 앱 목록에서 중지](https://developer.android.com/develop/background-work/services/fgs/handle-user-stopping)
 
 **재부팅 후 자동 시작**은 기본 꺼짐입니다. 켜고 저장하면 첫 잠금 해제 후 앱에 `BOOT_COMPLETED`가 전달될 때 저장한 설정으로 시작을 시도합니다. 주변 기기 권한이 있고 Bluetooth가 켜져 있거나 켜지는 중이어야 합니다. 이름이 있는 프로필은 저장된 이름과 기기 이름이 일치해야 합니다. Android의 백그라운드 제한, 강제 중지 상태, One UI 정책에 따라 부팅 방송 전달이나 서비스 시작이 생략 또는 거부될 수 있습니다. 자동 시작이 생략되면 앱에서 시작합니다. 수동으로 광고를 중지해도 저장된 부팅 옵션은 켜져 있으므로 다음 부팅에서도 시도합니다. 해제하려면 스위치를 끄고 저장합니다. [Android의 부팅 및 서비스 시작 제한](https://developer.android.com/develop/background-work/services/fgs/restrictions-bg-start)
 
@@ -70,4 +70,5 @@ adb -d shell am start -n com.onekey.blelab/.MainActivity
 - `:app:lintDebug` 성공. 오류 0개, Gradle 버전 권고 1개입니다. Wrapper는 AGP 9.5의 공식 기본 버전인 9.6.0을 사용합니다.
 - `apksigner verify`와 `zipalign -c -P 16 4`를 통과했습니다. APK SHA-256은 `e92998db65687e8251c5cfa9593125e2ed7c8027ae9c63f923f73eab34ee2fbd`입니다.
 - 사용자가 Galaxy S24+에서 APK 설치 성공을 확인했습니다.
+- 앱 1.1.0에서 Sticky 서비스 재시작과 저장 설정 복구를 구현했습니다. Samsung Galaxy에서 실제 시스템 프로세스 회수 후 복원은 아직 재현 검증하지 않았습니다.
 - Mac 검증 중 ADB로 연결된 기기는 없었습니다. 실제 무선 패킷 수신, Bluetooth OFF/ON 복구, 부팅, 화면 OFF 30분 및 60분 유지, 배터리와 발열은 미검증입니다.

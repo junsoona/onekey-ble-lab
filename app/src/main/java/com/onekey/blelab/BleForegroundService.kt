@@ -35,11 +35,14 @@ internal class BleForegroundService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
+            if (!ActiveSessionStore.clear(this)) {
+                DiagnosticLogger.record("송신 복구 설정을 지우지 못했습니다.")
+            }
             endSession()
             return START_NOT_STICKY
         }
-        if (packet != null) return START_NOT_STICKY
-        if (intent?.action != ACTION_START) {
+        if (packet != null) return START_STICKY
+        if (intent != null && intent.action != ACTION_START) {
             stopSelf()
             return START_NOT_STICKY
         }
@@ -53,7 +56,14 @@ internal class BleForegroundService : Service() {
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
             )
             LabRuntime.update { it.copy(foreground = true) }
-            val configuration = readConfiguration(intent)
+            val configuration = if (intent == null) {
+                ActiveSessionStore.load(this) ?: run {
+                    stopSelf()
+                    return START_NOT_STICKY
+                }
+            } else {
+                readConfiguration(intent)
+            }
             packet = configuration.validate().packet
             if (packet == null) {
                 fail("INVALID_CONFIGURATION · 광고 설정을 다시 확인하세요.")
@@ -63,11 +73,17 @@ internal class BleForegroundService : Service() {
                 this, bluetoothReceiver, PermissionManager.bluetoothEvents(), ContextCompat.RECEIVER_EXPORTED,
             )
             listening = true
+            if (intent == null) {
+                LabRuntime.update {
+                    SessionState(phase = Phase.STARTING, summary = packet?.summary())
+                }
+                DiagnosticLogger.record("시스템 서비스 재시작 · 저장한 송신 설정 복구")
+            }
             updateBluetoothState()
         } catch (error: RuntimeException) {
             fail("SERVICE_EXCEPTION · ${error.javaClass.simpleName} · ${error.message.orEmpty()}", error)
         }
-        return START_NOT_STICKY
+        return START_STICKY
     }
 
     private fun updateBluetoothState() {
@@ -134,6 +150,9 @@ internal class BleForegroundService : Service() {
     }
 
     private fun fail(message: String, cause: Throwable? = null) {
+        if (!ActiveSessionStore.clear(this)) {
+            DiagnosticLogger.record("실패한 송신의 복구 설정을 지우지 못했습니다.")
+        }
         if (LabRuntime.state.value.phase != Phase.TRANSMITTING) {
             LabRuntime.update { it.copy(lastStartResult = "실패 · $message") }
         }
@@ -219,8 +238,12 @@ internal class BleForegroundService : Service() {
                 .putExtra("mode", configuration.mode.name)
                 .putExtra("power", configuration.txPower.name)
             try {
+                check(ActiveSessionStore.save(context, configuration)) {
+                    "송신 복구 설정을 저장하지 못했습니다."
+                }
                 checkNotNull(ContextCompat.startForegroundService(context, intent))
             } catch (error: RuntimeException) {
+                ActiveSessionStore.clear(context)
                 val message = "FGS_START_REJECTED · ${error.javaClass.simpleName} · ${error.message.orEmpty()}"
                 LabRuntime.update { it.copy(phase = Phase.IDLE, lastStartResult = "실패 · $message") }
                 LabRuntime.error(message, error)
